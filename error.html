@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Access Denied</title>
+  <!-- Link to Bootstrap CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      background-color: #f8f9fa;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh; /* Make the body the full viewport height */
+      margin: 0;
+    }
+
+    .splash-screen {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      font-family: Arial, sans-serif;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3); /* Adding box shadow */
+      padding: 20px; /* Adding some padding to create space between the box and the content */
+      border-radius: 10px; /* Adding border-radius for rounded corners */
+      background-color: #ffffff; /* Changing the background color of the box */
+      max-width: 400px; /* Limiting the maximum width of the box */
+      margin: 0 auto; /* Centering the box horizontally */
+      max-height: 500px;
+    }
+
+    .error-message {
+      font-size: 24px;
+      color: #eb0505;
+      margin-bottom: 30px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .logo {
+        width: 150px;
+        height: 150px;
+        margin-bottom: 20px;
+      }
+    
+      .additional-info {
+        text-align: center; /* Center-align the text inside this div */
+      }
+  </style>
+</head>
+
+<body>
+    <div class="splash-screen">
+        <a href="https://www.iths.org/resources/wp-content/sabai/sites/9/File/files/3ca4a908947a3fea0c9deeb4766c3c44.jpg" target="_blank">
+          <img class="logo" src="https://www.iths.org/resources/wp-content/sabai/sites/9/File/files/3ca4a908947a3fea0c9deeb4766c3c44.jpg" alt="Logo">
+        </a>
+        <div class="error-message">
+          Access Denied
+        </div>
+        <div class="additional-info text-center"> <!-- Add 'text-center' class to center the text -->
+          <p>Sorry, you do not have permission to access this web app.</p>
+          <p>Please contact the system administrator for further assistance.</p>
+        </div>
+      </div>
+      
+
+  <!-- Link to Bootstrap JS and jQuery (optional) -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+
+</html>

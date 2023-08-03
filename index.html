@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WY Parcels Web Map</title>
+  <script src="https://cdn.auth0.com/js/auth0/9.17.0/auth0.min.js"></script>
+
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.4.1/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.4.1/mapbox-gl.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/1.20/auth0-spa-js.production.js"></script>
+
+  <style>
+
+
+    /* Set the map container to take up full screen */
+    #map {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #map-container {
+      display: none; /* Hide the map container by default */
+    }
+   
+    #side-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 420px;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.9); /* Adjust transparency here */
+      padding: 10px;
+    }
+    #demo {
+      overflow: hidden;
+    }
+    .mapboxgl-popup {
+      max-width: 400px;
+      font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+      }
+
+      #map-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+      }
+  
+      /* New CSS style for the side panel container */
+      #side-panel-container {
+        position: absolute;
+        top: 50px; /* Adjust the position as needed */
+        right: 10px; /* Adjust the position as needed */
+        width: 250px; /* Adjust the width as needed */
+        background-color: rgba(255, 255, 255, 0.9); /* Adjust transparency here */
+        padding: 10px;
+        display: none; /* Hide the side panel by default */
+        z-index: 999;
+      }
+
+   #loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #f5f5f5;
+  display: flex;
+  flex-direction: column; /* Add this line to arrange elements in a column */
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+#loading-screen .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #333;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+#loading-screen p {
+  margin-top: 10px; /* Adjust this value as needed to control the spacing between the spinner and the text */
+}
+      /* Hide the loading screen by default */
+#loading-screen.hidden {
+  display: none;
+}
+  </style>
+</head>
+<body>
+  <div id="loading-screen" class="hidden">
+    <div class="spinner"></div>
+    <p>Loading data</p>
+
+</div>
+<!-- Wrap map and toggle button inside a new container 
+<div id="map-container" style="display: none;"> -->
+  <div id="map"></div>
+  <button id="map-button" class="btn btn-primary">Toggle Layers</button>
+
+    <!-- New side panel container -->
+    <div id="side-panel-container">
+      <!-- Add your layers list or any other content here -->
+      <h3>Layers</h3>
+      <div class="form-check">
+        <input type="checkbox" class="form-check-input" id="layer1">
+        <label class="form-check-label" for="layer1">Layer 1</label>
+      </div>
+      <ul>
+        <li>Layer 1</li>
+        <li>Layer 2</li>
+        <li>Layer 3</li>
+        <!-- Add more layers here -->
+      </ul>
+    </div>
+
+  <div id="side-panel" style="height: 100%; overflow-y: auto;">
+    <div class="d-flex flex-column align-items-center">
+      <h3><strong>Western Wyoming Parcel Data</strong></h3>
+      <p>Use the sliders below to filter the parcel layer. The Parcel layer is a derived product that calculates the spatial relationship
+        with nearby features such as habitat cover, land use type, designated corridors, and big game seasonal ranges. 
+      </p>
+    </div>
+    <div class="d-flex justify-content-center">
+      <button id="reset-filters" class="btn btn-secondary">Reset Filters</button>
+      <span style="margin: 10px;"></span> <!-- Adding a space using a span element with margin -->
+      <button id="save-csv-button" class="btn btn-secondary">Download CSV</button>
+    </div>
+    <br>
+<div id="accordion">
+  <div class="card">
+    <div class="card-header" id="headingOne">
+      <h5 class="mb-0">
+        <button class="btn btn-link" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+          Percent of Parcel in Corridors
+        </button>
+      </h5>
+    </div>
+
+    <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#accordion">
+      <div class="card-body">
+        <h5>Select a Species</h5>
+        <select id = "animal-dropdown" name="animal-dropdown" class="form-control selectpicker">
+          <option value=""></option>
+          <option value="bison">Bison</option>
+          <option value="elk">Elk</option>
+          <option value="muledeer">Mule Deer</option>
+          <option value="pronghorn">Pronghorn</option>
+          <option value="moose">Moose</option>
+        </select>
+        <label for="lowuse-corridor-slider">Percent in Low Use Corridor:</label>
+        <input type="range" id="lowuse-corridor-slider" min="0" max="100" step="1" value="0">
+        <span id="lowuse-corridor-value">0</span>
+  
+        <br>
+  
+        <label for="mediumuse-corridor-slider">Percent in Medium Use Corridor:</label>
+        <input type="range" id="mediumuse-corridor-slider" min="0" max="100" step="1" value="0">
+        <span id="mediumuse-corridor-value">0</span>
+  
+        <br>
+  
+        <label for="highuse-corridor-slider">Percent in High Use Corridor:</label>
+        <input type="range" id="highuse-corridor-slider" min="0" max="100" step="1" value="0">
+        <span id="highuse-corridor-value">0</span>
+  
+        <br>
+  
+        <label for="stopover-corridor-slider">Percent in Stopover:</label>
+        <input type="range" id="stopover-corridor-slider" min="0" max="100" step="1" value="0">
+        <span id="stopover-corridor-value">0</span>      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header" id="headingTwo">
+      <h5 class="mb-0">
+        <button class="btn btn-link" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
+          Percent of Parcel in Seasonal Ranges
+        </button>
+      </h5>
+    </div>
+
+    <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordion">
+      <div class="card-body">
+        <select id = "animal-dropdown-2" name="animal-dropdown-2" class="form-control selectpicker">
+          <option value=""></option>
+          <option value="elk">Elk</option>
+          <option value="muledeer">Mule Deer</option>
+          <option value="pronghorn">Pronghorn</option>
+        </select>
+        <label for="cswr-slider">Percent in Crucial Severe Winter Relief:</label>
+        <input type="range" id="cswr-slider" min="0" max="100" step="1" value="0">
+        <span id="cswr-value">0</span>
+  
+        <br>
+  
+        <label for="cwin-slider">Percent in Crucial Winter Range:</label>
+        <input type="range" id="cwin-slider" min="0" max="100" step="1" value="0">
+        <span id="cwin-value">0</span>
+  
+        <br>
+  
+        <label for="cwyl-slider">Percent in Crucial Winter/Yearlong Range:</label>
+        <input type="range" id="cwyl-slider" min="0" max="100" step="1" value="0">
+        <span id="cwyl-value">0</span>
+  
+        <br>
+  
+        <label for="ssf-slider">Percent in Spring/Summer/Fall Range:</label>
+        <input type="range" id="ssf-slider" min="0" max="100" step="1" value="0">
+        <span id="ssf-value">0</span>      
+
+        <br>
+  
+        <label for="swr-slider">Percent in Severe Winter Relief:</label>
+        <input type="range" id="swr-slider" min="0" max="100" step="1" value="0">
+        <span id="swr-value">0</span>      
+      
+        <br>
+  
+        <label for="und-slider">Percent in Undefined Range:</label>
+        <input type="range" id="und-slider" min="0" max="100" step="1" value="0">
+        <span id="und-value">0</span>      
+      
+
+        <br>
+  
+        <label for="win-slider">Percent in Winter Range:</label>
+        <input type="range" id="win-slider" min="0" max="100" step="1" value="0">
+        <span id="win-value">0</span>      
+      
+
+        <br>
+  
+        <label for="wyl-slider">Percent in Winter/Yearlong Range:</label>
+        <input type="range" id="wyl-slider" min="0" max="100" step="1" value="0">
+        <span id="wyl-value">0</span>      
+
+        <br>
+  
+        <label for="yrl-slider">Percent in Yearlong Range:</label>
+        <input type="range" id="yrl-slider" min="0" max="100" step="1" value="0">
+        <span id="yrl-value">0</span>   
+      
+      
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header" id="headingThree">
+      <h5 class="mb-0">
+        <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+          Percent Perimeter of Land Use Types
+        </button>
+      </h5>
+    </div>
+    <div id="collapseThree" class="collapse" aria-labelledby="headingThree" data-parent="#accordion">
+      <div class="card-body">
+        <label for="public-perim-slider">Percent Perimeter Public Lands (10m):</label>
+        <input type="range" id="public-perim-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-public-value">0</span>
+      <br>
+        <label for="state-perim-slider">Percent Perimeter State Lands (10m):</label>
+        <input type="range" id="state-perim-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-state-value">0</span>
+      <br>
+        <label for="usfs-perim-slider">Percent Perimeter USFS (10m):</label>
+        <input type="range" id="usfs-perim-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-usfs-value">0</span>      
+        <br>
+        <label for="easment-perim-slider">Percent of area in Easment:</label>
+        <input type="range" id="easment-perim-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-easment-value">0</span>   
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header" id="headingFour">
+      <h5 class="mb-0">
+        <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour">
+          Percent of Habitat Coverage
+        </button>
+      </h5>
+    </div>
+    <div id="collapseFour" class="collapse" aria-labelledby="headingFour" data-parent="#accordion">
+      <div class="card-body">
+        <label for="deciduous-perc-slider">Percent Deciduous Forest:</label>
+        <input type="range" id="deciduous-perc-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-deciduous-value">0</span>
+      <br>
+        <label for="evergreen-perc-slider">Percent Evergreen Forest:</label>
+        <input type="range" id="evergreen-perc-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-evergreen-value">0</span>
+      <br>
+        <label for="cultivated-perc-slider">Percent Cultivated:</label>
+        <input type="range" id="cultivated-perc-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-cultivated-value">0</span>  
+        
+        <br>
+        <label for="woody-perc-slider">Percent Woody Wetlands:</label>
+        <input type="range" id="woody-perc-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-woody-value">0</span>  
+        <br>
+        <label for="wetland-perc-slider">Percent Herbacuous Wetland:</label>
+        <input type="range" id="wetland-perc-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-wetland-value">0</span>    
+        <br>
+        <label for="irrigated-perc-slider">Percent Irrigated:</label>
+        <input type="range" id="irrigated-perc-slider" min="0" max="100" step="1" value="0">
+        <span id="slider-irrigated-value">0</span>  
+       </div>
+    </div>
+  </div>
+
+
+
+</div>
+
+
+  </div>
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/oboe.js/2.1.4/oboe-browser.min.js"></script>
+
+  <script>
+
+    //  domain: "dev-dsdidplvqwkbsnyk.us.auth0.com",
+    //  client_id: "dFrYYqhqzIl3GWM1dRmpK533n8CPAQIU",
+//redirect_uri: window.location.origin,
+// Function to generate a random state value
+
+async function init() {
+
+
+  auth0Client = await createAuth0Client({
+    domain: "dev-dsdidplvqwkbsnyk.us.auth0.com",
+    client_id: "dFrYYqhqzIl3GWM1dRmpK533n8CPAQIU",
+    redirect_uri: "https://pathfinder.arcc.uwyo.edu/devise/MerkleLabGIS/index.html", //window.location.origin,
+  });
+
+  // handle coming back from login
+  if (location.search.includes("state=") &&
+    (location.search.includes("code=") || location.search.includes("error="))) {
+    console.log('Location Search:', location.search); // Check the value of location.search
+
+    try {
+      await auth0Client.handleRedirectCallback();
+      window.history.replaceState({}, document.title, "/");
+    } catch (error) {
+      console.error("An error occurred during login:", error);
+
+      // Handle "access_denied" error specifically
+      if (error.error === "access_denied") {
+        console.log("User is denied access. Redirecting to Auth0 login page...");
+        try {
+          // Redirect the user to the Auth0 sign-in page
+          //await auth0Client.loginWithRedirect();
+          window.location.href = "error.html";
+
+        } catch (loginError) {
+          console.error("An error occurred during login:", loginError);
+        }
+        return; // Stop further execution of init() until the user logs in and is redirected back
+      }
+      return;
+    }
+    window.location.href = "https://pathfinder.arcc.uwyo.edu/devise/MerkleLabGIS/index.html";
+  }
+
+  const isAuthenticated = await auth0Client.isAuthenticated();
+  console.log('isAuthenticated', isAuthenticated);
+ 
+  if (!isAuthenticated) {
+    console.log("User is not authenticated. Redirecting to Auth0 login page...");
+    try {
+      // Redirect the user to the Auth0 sign-in page
+      await auth0Client.loginWithRedirect();
+    } catch (error) {
+      console.error("An error occurred during login:", error);
+    }
+    return; // Stop further execution of init() until the user logs in and is redirected back
+  }
+  // Show the map container if the user is authenticated
+  const mapContainer = document.getElementById('map-container');
+  mapContainer.style.display = 'block';
+ 
+
+}
+
+// Call the init() function
+init()
+
+
+
+
+
+
+
+
+  // Web Map 
+    
+  const button = document.getElementById('map-button');
+  const sidePanelContainer = document.getElementById('side-panel-container');
+
+  // Add an event listener to the button for the click event
+  button.addEventListener('click', () => {
+    // Toggle the display property of the side panel container
+    if (sidePanelContainer.style.display === 'none') {
+      sidePanelContainer.style.display = 'block';
+    } else {
+      sidePanelContainer.style.display = 'none';
+    }
+  });
+    mapboxgl.accessToken = 'pk.eyJ1IjoianNoYXBpcjEiLCJhIjoiY2xqZ2w1czR6MDlkajNibjZza2M0NWF2aCJ9.HzDUGa8OFKUtnZswVlyYJA';
+    
+    /*oboe('data/ParcelsLayer_Derive_20230718.geojson')
+    .node('features.*', function(feature) {
+        // This function is called for each feature object in the features array
+        console.log(feature);
+        // Return undefined so Oboe.js discards this object and doesn't build up memory
+        return oboe.drop;
+    })
+    .done(function(things) {
+        console.log('All done');
+    })
+    .fail(function(errorReport) {
+        console.log('Oboe error:', errorReport);
+    });
+    */
+    // Function to save GeoJSON as a file
+    function saveGeoJSON(data, filename) {
+      var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      
+      document.body.appendChild(a);
+      a.click();
+      
+      window.URL.revokeObjectURL(url);
+    }
+
+    // Create the map
+    var map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [-107.2085, 43.0003],
+      zoom: 5
+    });
+
+    var geojsonData; // Variable to store the parsed GeoJSON data
+    var filteredGeojsonData ; // Variable to store the parsed GeoJSON data
+
+    document.getElementById("loading-screen").classList.remove("hidden");
+    //https://pathfinder.arcc.uwyo.edu/devise/MerkleLabGIS/WebApp/map.html
+        //https://pathfinder.arcc.uwyo.edu/devise/MerkleLabGIS/WebApp/Parcels/index.html
+
+    //my_geojson_data_west_wy.json
+    // Load the local GeoJSON file
+    fetch('https://pathfinder.arcc.uwyo.edu/devise/MerkleLabGIS/my_geojson_data_west_wy.json') // Replace 'my_geojson_data.json' with the correct path to your GeoJSON file
+      .then(function(response) {
+        return response.json(); // Parse the response as JSON
+      })
+      .then(function(data) {
+        geojsonData = data; // Save the GeoJSON data to the variable
+        console.log(geojsonData);
+        map.addSource('shapefile', {
+          type: 'geojson',
+          data: geojsonData // Use the saved GeoJSON data
+        });
+
+        map.addLayer({
+          id: 'shapefile-layer',
+          type: 'fill',
+          source: 'shapefile',
+          paint: {
+            'fill-color': '#0000FF',
+            'fill-outline-color': '#FFFFFF',
+            'fill-opacity': 0.5
+          }
+        });
+
+        document.getElementById("loading-screen").classList.add("hidden");
+
+
+        map.on('click', 'shapefile-layer', (e) => {
+          // Copy coordinates array.
+          const coordinates = e.lngLat;
+          const properties = e.features[0].properties;
+
+                  // Customize the popup content with desired properties
+        let ownerInfo;
+        if (properties.Owner1 === 'NA' || properties.Owner1 === '' ) {
+          ownerInfo = 'Public Lands';
+        } else {
+          ownerInfo = `${properties.Owner1} (${properties.Owner2 || 'No owner details'})`;
+          }
+
+          // Customize the popup content with desired properties
+          const description = `
+             <p><strong>County:</strong> ${properties.County}</p>
+             <p><strong>Parcel:</strong>${properties.Parcel}</p>
+             <p><strong>Owner:</strong>${properties.Owner1}</p>
+             <p>${properties.Owner2}</p>
+             <p><strong>Address:</strong>${properties.LocAdd}</p>
+             <p>${properties.Mail}</p>
+            <p><strong>Acres:</strong>${properties.Acres}</p>
+          `;
+      
+          new mapboxgl.Popup()
+            .setLngLat(coordinates)
+            .setHTML(description)
+            .addTo(map);
+        });
+      
+        // Change the cursor to a pointer when the mouse is over the places layer.
+        map.on('mouseenter', 'shapefile-layer', () => {
+          map.getCanvas().style.cursor = 'pointer';
+        });
+      
+        // Change it back to a pointer when it leaves.
+        map.on('mouseleave', 'shapefile-layer', () => {
+          map.getCanvas().style.cursor = '';
+        });
+
+// Define an array to store all slider IDs and their corresponding filter keys.
+
+        const slidersInfo = [
+        { id: 'easment-perim-slider', filterKey: 'Perc_Easem', valueSpan: 'slider-easment-value' },
+          { id: 'public-perim-slider', filterKey: 'Public_10m', valueSpan: 'slider-public-value' },
+          { id: 'state-perim-slider', filterKey: 'State_10m', valueSpan: 'slider-state-value' },
+          { id: 'usfs-perim-slider', filterKey: 'USFS_10m', valueSpan: 'slider-usfs-value' },
+          { id: 'lowuse-corridor-slider', filterKey: '', valueSpan: 'lowuse-corridor-value' },
+          { id: 'mediumuse-corridor-slider', filterKey: '', valueSpan: 'mediumuse-corridor-value' },
+          { id: 'highuse-corridor-slider', filterKey: '', valueSpan: 'highuse-corridor-value' },
+          { id: 'stopover-corridor-slider', filterKey: '', valueSpan: 'stopover-corridor-value' },
+          { id: 'deciduous-perc-slider', filterKey: 'NLCD_Dcds_', valueSpan: 'slider-deciduous-value' },
+          { id: 'evergreen-perc-slider', filterKey: 'NLCD_Evrgr', valueSpan: 'slider-evergreen-value' },
+          { id: 'cultivated-perc-slider', filterKey: 'NLCD_Cltvt', valueSpan: 'slider-cultivated-value' },
+          { id: 'woody-perc-slider', filterKey: 'NLCD_Wdy_W', valueSpan: 'slider-woody-value' },
+          { id: 'wetland-perc-slider', filterKey: 'NLCD_Hrbcs', valueSpan: 'slider-wetland-value' },
+          { id: 'irrigated-perc-slider', filterKey: 'Perc_Irrln', valueSpan: 'slider-irrigated-value' },
+          // seasonal ranges
+          { id: 'cswr-slider', filterKey: '', valueSpan: 'cswr-value' },
+          { id: 'cwin-slider', filterKey: '', valueSpan: 'cwin-value' },
+          { id: 'cwyl-slider', filterKey: '', valueSpan: 'cwyl-value' },
+          { id: 'ssf-slider', filterKey: '', valueSpan: 'ssf-value' },
+          { id: 'swr-slider', filterKey: '', valueSpan: 'swr-value' },
+          { id: 'und-slider', filterKey: '', valueSpan: 'und-value' },
+          { id: 'win-slider', filterKey: '', valueSpan: 'win-value' },
+          { id: 'wyl-slider', filterKey: '', valueSpan: 'wyl-value' },
+          { id: 'yrl-slider', filterKey: '', valueSpan: 'yrl-value' },
+        ];
+
+
+
+        const dropdown = document.getElementById('animal-dropdown');
+        const dropdown2 = document.getElementById('animal-dropdown-2');
+
+        // Low use corridor 
+        const lowuseCorridorSlider = document.getElementById('lowuse-corridor-slider');
+        const mediumuseCorridorSlider = document.getElementById('mediumuse-corridor-slider');
+        const highuseCorridorSlider = document.getElementById('highuse-corridor-slider');
+        const stopoverCorridorSlider = document.getElementById('stopover-corridor-slider');
+        const cswrSlider = document.getElementById('cswr-slider');
+        const undefinedSlider = document.getElementById('und-slider');
+
+
+        dropdown.addEventListener('change', function() {
+          console.log("Dropdown change event triggered with value: ", this.value);
+                    switch(this.value) {
+            case 'bison':
+              slidersInfo[3].filterKey = 'Bison_Corr';
+              slidersInfo[4].filterKey = 'BisonMed';
+              mediumuseCorridorSlider.disabled = false;
+              lowuseCorridorSlider.disabled = false;
+
+              slidersInfo[5].filterKey = 'BisonHigh2';
+              highuseCorridorSlider.disabled = false;
+
+              slidersInfo[6].filterKey = 'BisonStop';
+              stopoverCorridorSlider.disabled = false;
+
+              break;
+            case 'moose':
+              slidersInfo[3].filterKey = 'MooseLow1';
+              lowuseCorridorSlider.disabled = false;
+
+              slidersInfo[4].filterKey = 'MooseMed10';
+              mediumuseCorridorSlider.disabled = false;
+
+              slidersInfo[5].filterKey = 'MooseHigh2';
+              highuseCorridorSlider.disabled = false;
+              
+              slidersInfo[6].filterKey = 'MooseStop';
+              stopoverCorridorSlider.disabled = false;
+              break;
+            case 'elk':
+              slidersInfo[3].filterKey = 'ElkLow1';
+              lowuseCorridorSlider.disabled = false;
+
+              slidersInfo[4].filterKey = 'ElkMed10';
+              mediumuseCorridorSlider.disabled = false;
+
+              slidersInfo[5].filterKey = 'ElkHigh20';
+              highuseCorridorSlider.disabled = false;
+              
+              slidersInfo[6].filterKey = 'ElkStop';
+              stopoverCorridorSlider.disabled = false;
+
+              break;
+            case 'muledeer':
+              slidersInfo[3].filterKey = 'DeerLow1';
+              lowuseCorridorSlider.disabled = false;
+
+              slidersInfo[4].filterKey = 'DeerMed10';
+              mediumuseCorridorSlider.disabled = false;
+
+              slidersInfo[5].filterKey = 'DeerHigh20';
+              highuseCorridorSlider.disabled = false;
+              
+              slidersInfo[6].filterKey = 'DeerStop';
+              stopoverCorridorSlider.disabled = false;
+
+              break;
+            case 'pronghorn':
+              lowuseCorridorSlider.disabled = true;
+              mediumuseCorridorSlider.disabled = true;
+              highuseCorridorSlider.disabled = true;
+
+              stopoverCorridorSlider.disabled = true;
+
+
+              break;
+            default:
+              slidersInfo[3].filterKey = '';
+          }
+          console.log("New filterKey for lowuse-corridor-slider: ", slidersInfo[3].filterKey);
+        });
+
+
+
+        dropdown2.addEventListener('change', function() {
+          console.log("Dropdown change event triggered with value: ", this.value);
+                    switch(this.value) {
+
+            case 'elk':
+              slidersInfo[14].filterKey = 'Elk_CSWR';
+              slidersInfo[15].filterKey = 'Elk_CWIN';
+              slidersInfo[16].filterKey = 'Elk_CWYL';              
+              slidersInfo[17].filterKey = 'Elk_SSF';
+              slidersInfo[18].filterKey = 'Elk_SWR';
+              slidersInfo[19].filterKey = 'Elk_UND';
+              slidersInfo[20].filterKey = 'Elk_WIN';
+              slidersInfo[21].filterKey = 'Elk_WYL';
+              slidersInfo[22].filterKey = 'Elk_YRL';
+
+
+              break;
+            case 'muledeer':
+            cswrSlider.disabled = true;
+            undefinedSlider.disabled = true;
+
+            //slidersInfo[14].filterKey = 'Elk_CSWR';
+            slidersInfo[15].filterKey = 'DeerCWIN';
+            slidersInfo[16].filterKey = 'DeerCWYL';              
+            slidersInfo[17].filterKey = 'DeerSSF';
+            slidersInfo[18].filterKey = 'DeerSWR';
+           // slidersInfo[19].filterKey = 'Elk_UND';
+            slidersInfo[20].filterKey = 'DeerWIN';
+            slidersInfo[21].filterKey = 'DeerWYL';
+            slidersInfo[22].filterKey = 'DeerYRL';
+
+              break;
+            case 'pronghorn':
+            undefinedSlider.disabled = true;
+
+            slidersInfo[14].filterKey = 'PH_CSWR';
+            slidersInfo[15].filterKey = 'PH_CWIN';
+            slidersInfo[16].filterKey = 'PH_CWYL';              
+            slidersInfo[17].filterKey = 'PH_SSF';
+            slidersInfo[18].filterKey = 'PH_SWR';
+           // slidersInfo[19].filterKey = 'PH_WIN';
+            slidersInfo[20].filterKey = 'PH_WIN';
+            slidersInfo[21].filterKey = 'PH_WYL';
+            slidersInfo[22].filterKey = 'PH_YRL';
+
+
+              break;
+            default:
+              slidersInfo[3].filterKey = '';
+          }
+          
+        });
+ 
+
+        // Loop through the slidersInfo array to set up event listeners for all sliders.
+        slidersInfo.forEach((sliderInfo) => {
+          const slider = document.getElementById(sliderInfo.id);
+          const sliderValue = document.getElementById(sliderInfo.valueSpan);
+          let filterValue = 0; // Initialize the filter value for each slider.
+
+          slider.addEventListener('input', function () {
+            filterValue = parseInt(slider.value);
+            sliderValue.textContent = filterValue;
+            filterFeaturesBySliders();
+          });
+        });
+
+        function filterFeaturesBySliders() {
+          var filter = ['all'];
+
+          slidersInfo.forEach((sliderInfo) => {
+            const { filterKey, id } = sliderInfo;
+            const sliderValue = parseInt(document.getElementById(id).value);
+
+            if (sliderValue > 0) {
+              filter.push(['>=', filterKey, sliderValue]);
+            }
+          });
+
+          
+
+          if (filter.length > 1) {
+            console.log('Filter:', filter);
+            map.setFilter('shapefile-layer', filter);
+        
+            // Update the filteredGeojsonData with the filtered features
+            filteredGeojsonData = {
+              type: 'FeatureCollection',
+              features: map.queryRenderedFeatures({ layers: ['shapefile-layer'] })
+            };
+            console.log(filteredGeojsonData);
+
+          } else {
+            console.log('Filter:', null);
+            map.setFilter('shapefile-layer', null); // Show all features when no filters are active
+        
+            // Set filteredGeojsonData to null when there are no filters
+            filteredGeojsonData = null;
+          }
+        }
+
+        const resetButton = document.getElementById('reset-filters');
+
+      // Event listener for the reset button
+      resetButton.addEventListener('click', function () {
+        slidersInfo.forEach((sliderInfo) => {
+          const slider = document.getElementById(sliderInfo.id);
+          const sliderValue = document.getElementById(sliderInfo.valueSpan);
+
+          // Reset the slider to its default value (assuming the default value is 0)
+          slider.value = 0;
+          sliderValue.textContent = 0;
+        });
+
+        // Reset the dropdowns to their default values (assuming the default option has a value of '')
+        dropdown.value = '';
+        dropdown2.value = '';
+
+        // Call the function to filter features with the updated slider values
+        filterFeaturesBySliders();
+      });
+        
+ 
+
+        // Add a button to save the GeoJSON data
+        /*
+        var saveButton = document.createElement('button');
+        saveButton.textContent = 'Save GeoJSON';
+        saveButton.addEventListener('click', function() {
+          saveGeoJSON(geojsonData, 'my_geojson_data.json');
+        });
+
+        document.body.appendChild(saveButton); */
+      }) 
+      .catch(function(error) {
+        console.error('Error loading local GeoJSON file:', error);
+      });
+
+      const saveCSVButton = document.getElementById('save-csv-button');
+      function saveFilteredGeoJSONAsCSV(geojson, filename) {
+        // Convert the filtered GeoJSON to CSV format
+        console.log(filteredGeojsonData);
+        const features = filteredGeojsonData.features;
+        let csvContent = 'data:text/csv;charset=utf-8,';
+      
+        // Create the header row for CSV
+        const headerRow = Object.keys(features[0].properties).join(',') + '\n';
+        csvContent += headerRow;
+      
+        // Iterate through each feature and add its properties to the CSV
+        features.forEach((feature) => {
+          const properties = feature.properties;
+          const propertyValues = Object.values(properties).join(',') + '\n';
+          csvContent += propertyValues;
+        });
+      
+        // Create a Blob to hold the CSV data
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      
+        // Create a temporary anchor element to trigger the download
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+      
+        // Append the link to the DOM and simulate a click to download the file
+        document.body.appendChild(link);
+        link.click();
+      
+        // Clean up by removing the temporary anchor
+        document.body.removeChild(link);
+      }
+      
+      saveCSVButton.addEventListener('click', function() {
+        saveFilteredGeoJSONAsCSV(geojsonData, 'filtered_data.csv');
+      });
+
+    
+  </script>
+</body>
+</html>
